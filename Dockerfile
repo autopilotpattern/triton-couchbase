@@ -4,7 +4,7 @@
 FROM 		couchbase/server:enterprise-4.0.0-3508
 MAINTAINER 	Casey Bisson <casey.bisson@gmail.com>
 
-# installed Node.js, similar to https://github.com/joyent/docker-node/blob/428d5e69763aad1f2d8f17c883112850535e8290/0.12/Dockerfile
+# install Node.js, similar to https://github.com/joyent/docker-node/blob/428d5e69763aad1f2d8f17c883112850535e8290/0.12/Dockerfile
 RUN gpg --keyserver pool.sks-keyservers.net --recv-keys 7937DFD2AB06298B2293C3187D33FF9D0246406D 114F43EE0176B71C7BC219DD50A3051F888C628D
 
 ENV NODE_VERSION 0.12.4
@@ -13,6 +13,10 @@ ENV NPM_VERSION 2.10.1
 RUN apt-get update && \
     apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
+
+# update couchbase to the most recent available build
+RUN curl -SLO http://latestbuilds.hq.couchbase.com/couchbase-server/sherlock/4050/couchbase-server-enterprise_4.0.0-4050-ubuntu12.04_amd64.deb \
+    && dpkg -i couchbase-server-enterprise_4.0.0-4050-ubuntu12.04_amd64.deb
 
 RUN curl -SLO "http://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.gz" \
 	&& curl -SLO "http://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
