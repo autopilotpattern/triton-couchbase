@@ -149,7 +149,8 @@ then
             --cluster-init-username=Administrator \
             --cluster-init-password=password \
             --cluster-init-port=8091 \
-            --cluster-init-ramsize=$MYMEMORY
+            --cluster-init-ramsize=$MYMEMORY \
+            --services=data,index,query
 
         if [ $? -eq 0 ]
         then
@@ -212,10 +213,11 @@ else
     COUCHBASERESPONSIVE=0
     while [ $COUCHBASERESPONSIVE != 1 ]; do
         echo -n '.'
-
+        hostname=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
         curl -s -i -f -u Administrator:password \
-            "http://$CLUSTERIP:8091/controller/addNode" \
-            -d "hostname=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')&user=admin&password=password"
+             -d "hostname=${hostname}&user=admin&password=password&services=kv,index,n1ql" \
+            "http://$CLUSTERIP:8091/controller/addNode"
+
         if [ $? -eq 0 ]
         then
             let COUCHBASERESPONSIVE=1

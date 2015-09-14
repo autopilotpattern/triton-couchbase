@@ -17,7 +17,7 @@ then
     /usr/local/bin/triton-bootstrap &
 
     # Start Couchbase
-    /usr/local/bin/couchbase-start "$@"
+    /usr/sbin/runsvdir-start "$@"
 fi
 
 exec "$@"
