@@ -18,19 +18,19 @@ CONSUL="$(triton ip ${PREFIX}_consul_1):8500"
 echo
 echo 'Consul is now running'
 echo "Dashboard: $CONSUL"
-command -v open >/dev/null 2>&1 && `open http://$CONSUL/ui/`
+command -v open >/dev/null 2>&1 && open "http://$CONSUL/ui/"
 
 CBDASHBOARD="$(triton ip ${PREFIX}_couchbase_1):8091"
 echo
 echo 'Couchbase cluster running and bootstrapped'
 echo "Dashboard: $CBDASHBOARD"
-command -v open >/dev/null 2>&1 && `open http://$CBDASHBOARD/index.html#sec=servers`
+command -v open >/dev/null 2>&1 && open "http://$CBDASHBOARD/index.html#sec=servers"
 
 echo
 echo 'Creating couchbase bucket'
 # we're specifying a bucket with 2 replicas and using 70% of the 4096MB
 # we specified for the container in our docker-compose.yml
-curl -s -XPOST -u ${COUCHBASE_USER}:${COUCHBASE_PASS} \
+curl -s -XPOST -u "${COUCHBASE_USER}:${COUCHBASE_PASS}" \
      -d 'name=couchbase' \
      -d 'authType=none' \
      -d 'ramQuotaMB=2856' \
