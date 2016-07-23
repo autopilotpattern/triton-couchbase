@@ -19,7 +19,7 @@ Each time the [`health` handler](https://github.com/autopilotpattern/couchbase/b
 1. Is another node in the middle of bootstrapping the cluster? If so, wait for it and then join to it.
 1. Otherwise, bootstrap the cluster but let any other nodes know that we're doing it by writing a lock in Consul.
 
-### Getting started
+### Setting up with Triton (optional)
 
 1. [Get a Joyent account](https://my.joyent.com/landing/signup/) and [add your SSH key](https://docs.joyent.com/public-cloud/getting-started).
 1. Install the [Docker Toolbox](https://docs.docker.com/installation/mac/) (including `docker` and `docker-compose`) on your laptop or other environment, as well as the [Joyent Triton CLI](https://www.joyent.com/blog/introducing-the-triton-command-line-tool) (`triton` replaces our old `sdc-*` CLI tools)
@@ -30,7 +30,9 @@ curl -O https://raw.githubusercontent.com/joyent/sdc-docker/master/tools/sdc-doc
 ./sdc-docker-setup.sh -k us-east-1.api.joyent.com <ACCOUNT> ~/.ssh/<PRIVATE_KEY_FILE>
 ```
 
-Check that everything is configured correctly by running `./setup.sh`. If it returns without an error you're all set. This script will create and `_env` file that includes the Triton CNS name for the Consul service. You'll want to edit this file to update the username and password for Couchbase.
+### Getting started
+
+Check that everything is configured correctly by running `./setup.sh`. If it returns without an error you're all set. This script will create and `_env` file that includes the Triton CNS name for the Consul service if using Triton. You'll want to edit this file to update the username and password for Couchbase.
 
 ### Running the cluster
 
