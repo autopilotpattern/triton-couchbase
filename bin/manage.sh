@@ -12,8 +12,8 @@ help() {
 trap cleanup EXIT
 
 # This container's private IP
-export IP_PRIVATE=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-
+IP_PRIVATE=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
+export IP_PRIVATE
 # Discovery vars
 COUCHBASE_SERVICE_NAME=${COUCHBASE_SERVICE_NAME:-couchbase-api}
 export CONSUL=${CONSUL:-consul}
@@ -23,6 +23,19 @@ export COUCHBASE_USER=${COUCHBASE_USER:-Administrator}
 export COUCHBASE_PASS=${COUCHBASE_PASS:-password}
 CB_CONN="-c 127.0.0.1:8091 -u ${COUCHBASE_USER} -p ${COUCHBASE_PASS}"
 
+# Set all services as default and verify that those are the only options allowed
+export COUCHBASE_SERVICES=${COUCHBASE_SERVICES:-data,index,query}
+RGE=$(
+    grep -Fxv -f \
+        <(echo -n "data,index,query" | tr , "\n") \
+        <(echo -n "$COUCHBASE_SERVICES" | tr , "\n")
+)
+
+if [ "$RGE" != "" ]; then
+    echo "Unknown couchbase service '$(echo -n "$RGE" \
+        | tr "\n" , )'. Only 'data', 'index' and 'query' are supported"
+    exit 1
+fi
 # -------------------------------------------
 # Top-level health check handler
 
@@ -43,9 +56,10 @@ health() {
     # of creating a new cluster, we'll wait for it instead.
     echo 'Looking for an existing cluster...'
     while true; do
-        local node=$(getHealthyClusterIp)
+        local node
+        node=$(getHealthyClusterIp)
         if [[ ${node} != "null" ]]; then
-            joinCluster $node
+            joinCluster "$node"
         else
             obtainBootstrapLock
             if [ $? -eq 0 ]; then
@@ -76,7 +90,7 @@ initNode() {
             break
         fi
         # check the initialized creds as well
-        couchbase-cli server-info ${CB_CONN} &>/dev/null
+        couchbase-cli server-info "${CB_CONN}" &>/dev/null
         if [ $? -eq 0 ]; then
             break
         fi
@@ -86,17 +100,18 @@ initNode() {
     couchbase-cli node-init -c 127.0.0.1:8091 -u access -p password \
                   --node-init-data-path=/opt/couchbase/var/lib/couchbase/data \
                   --node-init-index-path=/opt/couchbase/var/lib/couchbase/data \
-                  --node-init-hostname=${IP_PRIVATE} &>/dev/null \
+                  --node-init-hostname="${IP_PRIVATE}" &>/dev/null \
         && echo '# Node initialized'
 }
 
 isNodeInCluster() {
-    couchbase-cli server-list ${CB_CONN} | grep ${IP_PRIVATE} &>/dev/null
+    couchbase-cli server-list "${CB_CONN}" | grep "${IP_PRIVATE}" &>/dev/null
     return $?
 }
 
 doHealthCheck() {
-    local status=$(couchbase-cli server-info ${CB_CONN} | jq -r .status)
+    local status
+    status=$(couchbase-cli server-info "${CB_CONN}" | jq -r .status)
     if [[ $status != "healthy" ]]; then
        echo "Node not healthy, status was: $status"
        return 1
@@ -111,7 +126,7 @@ doHealthCheck() {
 
 # We only need one IP from the healthy cluster in order to join it.
 getHealthyClusterIp() {
-    echo $(curl -Lsf http://${CONSUL}:8500/v1/health/service/${COUCHBASE_SERVICE_NAME}?passing | jq -r .[0].Service.Address)
+    curl -Lsf "http://${CONSUL}:8500/v1/health/service/${COUCHBASE_SERVICE_NAME}?passing" | jq -r .[0].Service.Address
 }
 
 # If we fail to join the cluster, then bail out and hit it on the
@@ -119,7 +134,7 @@ getHealthyClusterIp() {
 joinCluster(){
     echo '# Joining cluster...'
     local node=$1
-    curl -Lsif -u ${COUCHBASE_USER}:${COUCHBASE_PASS} \
+    curl -Lsif -u "${COUCHBASE_USER}:${COUCHBASE_PASS}" \
          -d "hostname=${IP_PRIVATE}&user=admin&password=password" \
          "http://${node}:8091/controller/addNode" || exit 1
     echo 'Joined cluster!'
@@ -135,7 +150,7 @@ rebalance() {
     echo '# Rebalancing cluster...'
     while true; do
         echo -n '.'
-        couchbase-cli rebalance ${CB_CONN} && return
+        couchbase-cli rebalance "${CB_CONN}" && return
         sleep .7
     done
 }
@@ -149,8 +164,10 @@ rebalance() {
 # to show up as healthy in Consul.
 obtainBootstrapLock() {
     echo 'No cluster nodes found, trying to obtain lock on bootstrap...'
-    local session=$(curl -Lsf -XPUT -d '{"Name": "couchbase-bootstrap", "TTL": "120s"}' http://${CONSUL}:8500/v1/session/create | jq -r .ID) || return $?
-    local lock=$(curl -Lsf -XPUT http://${CONSUL}:8500/v1/kv/couchbase-bootstrap?acquire=$session)
+    local session
+    session=$(curl -Lsf -XPUT -d '{"Name": "couchbase-bootstrap", "TTL": "120s"}' "http://${CONSUL}:8500/v1/session/create" | jq -r .ID) || return $?
+    local lock
+    lock=$(curl -Lsf -XPUT "http://${CONSUL}:8500/v1/kv/couchbase-bootstrap?acquire=$session")
     if [[ $lock == "true" ]]; then
         return 0
     else
@@ -164,15 +181,17 @@ initCluster() {
     echo '# Bootstrapping cluster...'
 
     # Couchbase resource limits
-    local avail_memory=$(free -m | grep -o "Mem:\s*[0-9]*" | grep -o "[0-9]*")
-    local cb_memory=$((($avail_memory/10)*7))
+    local avail_memory
+    avail_memory=$(free -m | grep -o "Mem:\s*[0-9]*" | grep -o "[0-9]*")
+    local cb_memory
+    cb_memory=$(( (avail_memory / 10) * 7 ))
 
     couchbase-cli cluster-init -c 127.0.0.1:8091 -u access -p password \
-                  --cluster-init-username=${COUCHBASE_USER} \
-                  --cluster-init-password=${COUCHBASE_PASS} \
+                  --cluster-init-username="${COUCHBASE_USER}" \
+                  --cluster-init-password="${COUCHBASE_PASS}" \
                   --cluster-init-port=8091 \
-                  --cluster-init-ramsize=${cb_memory} \
-                  --services=data,index,query
+                  --cluster-init-ramsize="${cb_memory}" \
+                  --services="$COUCHBASE_SERVICES"
 
     echo '# Cluster bootstrapped'
     echo
@@ -183,7 +202,7 @@ initCluster() {
 # stats mcdMemoryAllocated
 # stats systemStats.mem_free
 stats() {
-    curl -s --fail -u ${COUCHBASE_USER}:${COUCHBASE_PASS} \
+    curl -s --fail -u "${COUCHBASE_USER}:${COUCHBASE_PASS}" \
          http://127.0.0.1:8091/pools/default | \
         jq -r "$(printf '.nodes[] | select(.hostname | contains("%s")) | .%s' "${IP_PRIVATE}" "$1")"
 }
