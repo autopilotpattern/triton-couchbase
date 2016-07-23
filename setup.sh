@@ -71,9 +71,9 @@ check() {
     docker_user=$(docker info 2>&1 | awk -F": " '/SDCAccount:/{print $2}')
     local docker_dc
     docker_dc=$(echo "$DOCKER_HOST" | awk -F"/" '{print $3}' | awk -F'.' '{print $1}')
-    TRITON_USER=$(triton profile get | awk -F": " '/account:/{print $2}')
-    TRITON_DC=$(triton profile get | awk -F"/" '/url:/{print $3}' | awk -F'.' '{print $1}')
-    TRITON_ACCOUNT=$(triton account get | awk -F": " '/id:/{print $2}')
+    TRITON_USER=$(triton profile get 2>/dev/null | awk -F": " '/account:/{print $2}' 2>/dev/null) || true
+    TRITON_DC=$(triton profile get 2>/dev/null | awk -F"/" '/url:/{print $3}' | awk -F'.' '{print $1}' 2>/dev/null) || true
+    TRITON_ACCOUNT=$(triton account get 2>/dev/null | awk -F": " '/id:/{print $2}' 2>/dev/null) || true
     if [ ! -z "$TRITON_ACCOUNT" ] && [ ! "$docker_user" = "$TRITON_USER" ] || [ ! "$docker_dc" = "$TRITON_DC" ]; then
         echo
         tput rev  # reverse
@@ -89,8 +89,8 @@ check() {
     fi
 
     local triton_cns_enabled
-    triton_cns_enabled=$(triton account get | awk -F": " '/cns/{print $2}')
-    if [ ! "true" == "$triton_cns_enabled" ]; then
+    triton_cns_enabled=$(triton account get 2>/dev/null | awk -F": " '/cns/{print $2}') || true
+    if [ ! -z "$TRITON_ACCOUNT" ] && [ ! "true" == "$triton_cns_enabled" ]; then
         echo
         tput rev  # reverse
         tput bold # bold
