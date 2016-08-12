@@ -69,10 +69,10 @@ check() {
     # make sure Docker client is pointed to the same place as the Triton client
     local docker_user=$(docker info 2>&1 | awk -F": " '/SDCAccount:/{print $2}')
     local docker_dc=$(echo $DOCKER_HOST | awk -F"/" '{print $3}' | awk -F'.' '{print $1}')
-    TRITON_USER=$(triton profile get | awk -F": " '/account:/{print $2}')
-    TRITON_DC=$(triton profile get | awk -F"/" '/url:/{print $3}' | awk -F'.' '{print $1}')
-    TRITON_ACCOUNT=$(triton account get | awk -F": " '/id:/{print $2}')
-    if [ ! "$docker_user" = "$TRITON_USER" ] || [ ! "$docker_dc" = "$TRITON_DC" ]; then
+    TRITON_USER=$(triton profile get 2>/dev/null | awk -F": " '/account:/{print $2}') || true
+    TRITON_DC=$(triton profile get 2>/dev/null | awk -F"/" '/url:/{print $3}' | awk -F'.' '{print $1}') || true
+    TRITON_ACCOUNT=$(triton account get 2>/dev/null | awk -F": " '/id:/{print $2}') || true
+    if [ ! -z "$TRITON_ACCOUNT" ] && [ ! "$docker_user" = "$TRITON_USER" ] || [ ! "$docker_dc" = "$TRITON_DC" ]; then
         echo
         tput rev  # reverse
         tput bold # bold
@@ -86,8 +86,8 @@ check() {
         exit 1
     fi
 
-    local triton_cns_enabled=$(triton account get | awk -F": " '/cns/{print $2}')
-    if [ ! "true" == "$triton_cns_enabled" ]; then
+    local triton_cns_enabled=$(triton account get 2>/dev/null | awk -F": " '/cns/{print $2}') || true
+    if [ ! -z "$TRITON_ACCOUNT" ] && [ ! "true" == "$triton_cns_enabled" ]; then
         echo
         tput rev  # reverse
         tput bold # bold
@@ -99,10 +99,17 @@ check() {
 
     if [ ! -f "_env" ]; then
         echo "Creating a configuration file..."
-        echo 'COUCHBASE_USER=' > _env
-        echo 'COUCHBASE_PASS=' >> _env
-        echo >> _env
-        echo CONSUL=consul.svc.${TRITON_ACCOUNT}.${TRITON_DC}.cns.joyent.com >> _env
+        {
+            echo 'COUCHBASE_USER='
+            echo 'COUCHBASE_PASS='
+            echo 'COUCHBASE_SERVICES='
+            echo ''
+            if [ ! -z "$TRITON_ACCOUNT" ]; then
+                echo "CONSUL=consul.svc.${TRITON_ACCOUNT}.${TRITON_DC}.cns.joyent.com"
+                echo ''
+            fi
+        } > _env
+        echo 'Edit the _env file to include a COUCHBASE_USER, COUCHBASE_PASS and COUCHBASE_SERVICES (optional)'
         echo 'Edit the _env file to include a COUCHBASE_USER and COUCHBASE_PASS'
     fi
 }

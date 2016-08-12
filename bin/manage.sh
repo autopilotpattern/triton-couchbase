@@ -23,6 +23,20 @@ export COUCHBASE_USER=${COUCHBASE_USER:-Administrator}
 export COUCHBASE_PASS=${COUCHBASE_PASS:-password}
 CB_CONN="-c 127.0.0.1:8091 -u ${COUCHBASE_USER} -p ${COUCHBASE_PASS}"
 
+# Set all services as default and verify that those are the only options allowed
+export COUCHBASE_SERVICES=${COUCHBASE_SERVICES:-data,index,query}
+RGE=$(
+    grep -Fxv -f \
+        <(echo -n "data,index,query" | tr , "\n") \
+        <(echo -n "$COUCHBASE_SERVICES" | tr , "\n")
+)
+
+if [ "$RGE" != "" ]; then
+    echo "Unknown couchbase service '$(echo -n "$RGE" \
+        | tr "\n" , )'. Only 'data', 'index' and 'query' are supported"
+    exit 1
+fi
+
 # -------------------------------------------
 # Top-level health check handler
 
@@ -172,7 +186,7 @@ initCluster() {
                   --cluster-init-password=${COUCHBASE_PASS} \
                   --cluster-init-port=8091 \
                   --cluster-init-ramsize=${cb_memory} \
-                  --services=data,index,query
+                  --services="${COUCHBASE_SERVICES}"
 
     echo '# Cluster bootstrapped'
     echo
